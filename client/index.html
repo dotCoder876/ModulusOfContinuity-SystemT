@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Blockly Demo: Custom Turtle Field</title>
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="blocks.js"></script>
+    <style>
+      #importExport * {
+        vertical-align: middle;
+      }
+      #importExport {
+        font-family: 'Courier New', monospace;
+        vertical-align: middle;
+        padding:10px;
+        margin: 20px;
+        align-items: center;
+        vertical-align: middle;
+        text-align: center;
+        width: 800px;
+        height: 250px;
+        border: thin solid black;
+      }
+      body {
+        margin: 0 10%;
+        background-color: #fff;
+        font-family: sans-serif;
+      }
+      h1 {
+        font-weight: normal;
+        font-size: 140%;
+      }
+      td {
+        padding: 1ex;
+      }
+      img {
+        border: none;
+      }
+    </style>
+
+    </style>
+    <link rel="stylesheet" type="text/css" href="turtle.css">
+  </head>
+  <body onload="start()">
+    <h1>CM30082: Individual project</h1>
+    <h2>Inductive functions in System T: Modulus of continuity</h2>
+    <img src="logo_built_with.png" height="50px" />
+    <img src="http://www.mathml-association.org/logo/mathml-square-logo-500.png" height="50px" />
+    <p>
+      This is my CM30082 project about performing operations on lambda-terms in System <em>T</em>.
+    </p>
+
+    <table>
+      <tr>
+        <td>
+          <div id="blocklyDiv" style="width: 600px; height: 400px;"></div>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <input type="button" value="Echo" onclick="echoCall()">
+          <input type="button" value="Normal form" onclick="normalizeCall()">
+          <input type="button" value="Modulus of continuity" onclick="modulusCall()">
+          <input type="button" value="Type check" onclick="typeCheckCall()">
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div id="importExport"
+                    style="width: 600px; height: 200px;"></div>
+        </td>
+      </tr>
+
+    </table>
+    <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
+      <category name="Types" colour="200">
+        <block type="nat"></block>
+        <block type="function"></block>
+      </category>
+      <category name="Terms" colour="160">
+        <block type="variable"></block>
+        <block type="abstraction"></block>
+        <block type="application"></block>
+        <block type="zero"></block>
+        <block type="successor"></block>
+        <block type="recursor"></block>
+      </category>
+    </xml>
+
+    <script>
+function testContext(str) {
+  try {
+    var parsed = JSON.parse(str);
+    var decs = parsed['context']['declarations'];
+    var vn = unique(decs.map(a => a['vn']));
+    var t = decs.map(a => a['t']);
+    if (vn.length == t.length) {
+      return true;
+    } else {
+      return false;
+    }
+  } catch (Exception) {
+    return false;
+  }
+  return true;
+}
+      function testJSON(str) {
+    try {
+      JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
+
+
+      function appendDom() {
+        var blocks = document.getElementById('workspace-blocks');
+        if (blocks.firstElementChild) {
+          Blockly.Xml.appendDomToWorkspace(blocks, workspace);
+        }
+      }
+
+      const generator = new Blockly.Generator('JSON');
+generator.PRECEDENCE = 0;
+generator['set_context'] = function(block) {
+     var arr = [...Array(block.childBlocks_.length).keys()];
+     var var_names = block.inputList.map(x => x.fieldRow[0].value_);
+     var types = arr.map(b => generator.valueToCode(block, 'ADD' + b, generator.PRECEDENCE));
+     context = '\"context\":{\"declarations\":[' + arr.map(b => '{\"vn\":\"' + var_names[b] +'\",\"t\":' + types[b] + '}').join(',') + ']},'
+     console.log(context);
+     return context;
+};
+generator['set_term'] = function(block) {
+  var value_name = generator.valueToCode(block, 'NAME', generator.PRECEDENCE);
+  var code = '\"term\":' + value_name + ',';
+  return code;
+};
+generator['nat'] = function(block) {
+  return ['{\"category\":\"NAT\"}', generator.PRECEDENCE];
+};
+generator['function'] = function(block) {
+  var value_dom = generator.valueToCode(block, 'DOM', generator.PRECEDENCE);
+  var value_cod = generator.valueToCode(block, 'COD', generator.PRECEDENCE);
+  var code ='{\"category\":"FUNCTION\",\"dom\":' + value_dom + ',\"cod\":'+ value_cod  + '}';
+  return [code, generator.PRECEDENCE];
+};
+generator['variable'] = function(block) {
+  var text_var = block.getFieldValue('VAR');
+  var code = '{\"category\":\"VARIABLE\",\"var\":\"' + text_var + '\"}';
+  return [code,generator.PRECEDENCE];
+};
+generator['abstraction'] = function(block) {
+  var text_abvar = block.getFieldValue('ABVAR');
+  var value_abtype = generator.valueToCode(block, 'ABTYPE',  generator.PRECEDENCE);
+  var value_body = generator.valueToCode(block, 'BODY',  generator.PRECEDENCE);
+  var code = '{\"category\":\"ABSTRACT\",\"abvar\":\"' + text_abvar + '\",\"abtype\":' + value_abtype + ',\"body\":' + value_body + '}';
+  return [code, generator.PRECEDENCE];
+};
+generator['application'] = function(block) {
+  var value_left = generator.valueToCode(block, 'LEFT', generator.PRECEDENCE );
+  var value_right = generator.valueToCode(block, 'RIGHT', generator.PRECEDENCE);
+  var code = '{\"category\":\"APPLY\",\"left\":' + value_left + ',\"right\":' + value_right + '}';
+  return [code, generator.PRECEDENCE];
+};
+generator['recursor'] = function(block) {
+  var value_rectype = generator.valueToCode(block, 'RECTYPE', generator.PRECEDENCE);
+  var code = '{\"category\":\"REC\",\"rectype\":' + value_rectype + '}';
+  return [code,  generator.PRECEDENCE];
+};
+generator['successor'] = function(block) {
+  var code = '{\"category\":\"SUCC\"}';
+  return [code, generator.PRECEDENCE];
+};
+generator['zero'] = function(block) {
+  var code = '{\"category\":\"ZERO\"}';
+  return [code, generator.PRECEDENCE];
+};
+generator.scrub_ = function(block, code, opt_thisOnly) {
+  const nextBlock =
+      block.nextConnection && block.nextConnection.targetBlock();
+  const nextCode =
+      opt_thisOnly ? '' : generator.blockToCode(nextBlock);
+  return code +  nextCode;
+};
+
+function size(json) {
+  switch (json["category"]) {
+    case "NAT":
+      return 1;
+    case "FUNCTION":
+      return 2;
+    case "PRODUCT":
+      return 2;
+    case "VARIABLE":
+      return 1;
+    case "SUCC":
+      return 1;
+    case "ZERO":
+      return 1;
+    case "APPLY":
+      return 2;
+    case "ABSTRACT":
+      return 2;
+    case "VALUE":
+      return 1;
+    case "MODULUS":
+      return 1;
+    case "MAX":
+      return 1;
+    case "PAIR":
+      return 1;
+  }
+  return -1;
+}
+
+function isNumeric(str){
+    return /^\d+$/.test(str);
+}
+function isLetter(str) {
+  return str.length === 1 && str.match(/[a-z]/i);
+}
+function subscriptHandlerNumeric(s) {
+  var ar      = s.split('');
+  var nums    = ar.filter(isNumeric);
+  var letters = ar.filter(isLetter);
+  console.log(nums);
+  console.log(typeof(nums));
+  if (nums.length == 0) {
+    return '<mi>' + s + '</mi>';
+  } else if (s.equals(letters.join('') + nums.join(''))) {
+    return '<msub><mi>' + letters.join('') + '</mi><mn>' +  nums.join('') + '</mn></msub>';
+  } else {
+    return '<mi>'+ s +'</mi>';
+  }
+}
+
+function superscriptHandler(s) {
+  if (s.endsWith('^b')) {
+    var t = s.replace('^b', '');
+    return '<msup>' + subscriptHandlerNumeric(t) + '<mi>b</mi></msup>';
+  } else {
+    return subscriptHandlerNumeric(s);
+  }
+}
+function toHTML(json){
+  console.log(json.hasOwnProperty('category'), json);
+  switch(json["category"]) {
+    case "OKAY":
+      return '<math>' + toHTML(json['ok']) + '</math>';
+    case "ERROR":
+      return '<ul>' + toHTML(json['err']) + '</ul>';
+    case "CONTAINERERROR":
+      return '<li>container error</li>';
+    case "VARNOTFOUNDERROR":
+      return '<li>var not found error: ' + toHTML(json['var']) + '</li>' ;
+    case "APPLYERROR":
+      return '<li>application error: <math>' + toHTML(json['m']) + '</math>, <math>' + toHTML(json['n']) + '</math></li>' ;
+    case "MAXERROR":
+      return '<li>max error: <math>' + toHTML(json['m']) + '</math>, <math>' + toHTML(json['n']) + '</math></li>'
+    case "VALUEERROR":
+      return '<li>value error: <math>' + toHTML(json['m']) + '</math></li>'
+    case "MODULUSERROR":
+      return '<li>modulus error: <math>' + toHTML(json['m']) + '</math></li>'
+    case "BTRANSLATIONTYPE":
+      return '<li>b-translation (type) error: <math>' + toHTML(json['m']) + '</math></li>'
+    case "BTRANSLATIONTERM":
+      return '<li>b-translation (term) error: <math>' + toHTML(json['m']) + '</math>, <math>' + toHTML(json['n']) +  '</math></li>'
+    case "KLEISLIERROR":
+      return '<li>kleisli error: <math>' + toHTML(json['tau']) + '</math></li>'
+    case "MODULUSOFCONTINUITYERROR":
+      return '<li>modulus of continuity error: <math>' + toHTML(json['tau']) + '</math></li>'
+    case "CHAINERROR1":
+      return '<li>' + json['message'] +'<ul>' + toHTML(json['te']) + '</ul></li>'
+    case "CHAINERROR2":
+      return '<li>' + json['message'] +'<ul>' + toHTML(json['te1']) +  toHTML(json['te2']) + '</ul></li>'
+    case "CHAINERRORMANY":
+      return '<li>' + json['message'] +'<ul>' + json['errors'].map(toHTML).join('') + '</ul></li>'
+    case "NAT":
+      return '&#8469;';
+    case "NATB":
+      return '<msup><mi>&#8469;</mi><mi>b</mi></msup>';
+    case "FUNCTION":
+      var s;
+      if (size(json['dom']) > 1) {
+        s =  '<mn>(</mn>' + toHTML(json['dom']) + '<mn>)</mn>'
+      } else {
+        s =  toHTML(json['dom'])
+      }
+      var t;
+      if (size(json['cod']) > 1) {
+        t =  '<mn>(</mn>' + toHTML(json['cod']) + '<mn>)</mn>'
+      } else {
+        t =  toHTML(json['cod'])
+      }
+      return s + '&nbsp<mn>&rarr;</mn>&nbsp' +  t;
+    case "PRODUCT":
+      var s;
+      if (size(json['left']) > 1) {
+        s = '<mn>(</mn>' + toHTML(json['left']) + '<mn>)</mn>'
+      } else {
+        s = toHTML(json['left'])
+      }
+      var t;
+      if (size(json['right']) > 1) {
+        t = '<mn>(</mn>' + toHTML(json['right']) + '<mn>)</mn>'
+      } else {
+        t =  toHTML(json['right'])
+      }
+      return  s + '&nbsp<mn>&times;</mn>&nbsp' + t;
+    case "VARIABLE":
+      return  superscriptHandler(json['var']);
+    case "SUCC":
+      return '<mi>succ</mi>';
+    case "ZERO":
+      return '<mn>0</mn>';
+    case "REC":
+      return '<msub><mi>rec</mi><mn>' + toHTML(json['rectype']) + '</mn></msub>';
+    case "APPLY":
+      var s;
+      if (size(json['left']) > 1) {
+        s =  '(' + toHTML(json['left']) + ')'
+      } else {
+        s =  toHTML(json['left'])
+      }
+      var t;
+      if (size(json['right']) > 1) {
+        t =  '(' + toHTML(json['right']) + ')'
+      } else {
+        t =  toHTML(json['right'])
+      }
+      return s + '&nbsp;' + t;
+    case "ABSTRACT":
+      return '&lambda;(' + superscriptHandler(json['abvar']) + ': '+ toHTML(json['abtype']) +')&nbsp;.&nbsp; ' + toHTML(json['body']);
+    case "MAX":
+      return '<mi>max</mi>(' + toHTML(json['left']) + ',&nbsp;' + toHTML(json['right']) + ')';
+    case "VALUE":
+      return '<msub><mi>V</mi><mn>' + toHTML(json['content']) + '</mn></msub>';
+    case "MODULUS":
+      return '<msub><mi>M</mi><mn>' + toHTML(json['content']) + '</mn></msub>';
+    case "PAIR":
+      return '<mn>&lang;</mn>' + toHTML(json['left'])+';&nbsp;'+ toHTML(json['right'])+ '<mn>&rang;</mn>';
+  }
+}
+workspace = [];
+function start() {
+  workspace = Blockly.inject('blocklyDiv', options);
+  appendDom();
+  workspace.addChangeListener(Blockly.Events.disableOrphans);
+  this.workspace.scrollCenter();
+}
+
+function echoCall () {
+  compute('E');
+}
+function normalizeCall () {
+  compute('N');
+}
+function modulusCall () {
+  compute('M');
+}
+function typeCheckCall () {
+  compute('T');
+}
+function compute(command) {
+  var output = document.getElementById('importExport');
+  var json = generator.workspaceToCode(workspace).toString();
+  const xhr = new XMLHttpRequest();
+  pre  = ('{\"category\":\"INPUTSTRUCTURE\",\"command\":\"'+ command + '\",'  + json.slice(0, json.length - 1) + '}').replace(/(?:\r\n|\r|\n)/g, '');
+  console.log('pre ', pre);
+  if (!testJSON(pre)) {
+    console.log('error1: ', pre);
+    mathHandler("<ul><li>fill all the gaps in the term/context</li></ul>");
+    output.focus();
+    return;
+  }
+  try {
+    if (pre.includes('~') || pre.includes('^') || pre.includes('\\')  || pre.includes('\"\"')) {
+      mathHandler("<ul><li>don't include ~, ^, \\ </li> <li> variable names can't be empty</li></ul>");
+      output.focus();
+      return;
+    }
+  } catch (Exception) {
+    mathHandler("<ul> <li> don't include ~, ^, \\ </li> <li> variable names can't be empty </li> </ul>");
+    output.focus();
+    return;
+  }
+  if (testContext(pre)) {
+    mathHandler("<ul> <li> don't repeat variable names in the context </li> </ul>");
+    output.focus();
+    return;
+  }
+  var response="";
+  xhr.onload = () => {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      response = xhr.responseText;
+      console.log("response=", response);
+      console.log(JSON.parse(response));
+      var res = toHTML(JSON.parse(response));
+      mathHandler(res);
+    }
+  };
+  xhr.open('POST', 'http://localhost:8000');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.send(pre);
+  output.focus();
+}
+function mathHandler(res) {
+  const math = document.querySelector('#importExport');
+  math.innerHTML = res;
+  return math;
+}
+      var options = {
+        media: '../../../media/',
+        grid: {
+          spacing: 25,
+          length: 3,
+          colour: '#ccc'
+        },
+        move: {
+          scrollbars: true,
+          drag: true,
+          wheel: true,
+        },
+        zoom: {
+          controls: true,
+          startScale: 1.0,
+          maxScale: 4,
+          minScale: 0.25,
+          scaleSpeed: 1.1
+        },
+        toolbox: document.getElementById('toolbox')
+      }
+
+    </script>
+
+    <xml xmlns="https://developers.google.com/blockly/xml" id="workspace-blocks" style="display: none">
+      <block type="set_term" y="100"></block>
+      <block type="set_context" y="200"></block>
+    </xml>
+  </body>
+</html>
